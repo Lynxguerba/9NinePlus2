@@ -71,6 +71,7 @@ function placeItem(reset = false) {
 }
 
 // === INPUT EVENTS ===
+// Keyboard
 window.addEventListener("keydown", (e) => {
   const k = e.key;
   if (k === "ArrowLeft" || k.toLowerCase() === "a") {
@@ -96,36 +97,60 @@ window.addEventListener("keyup", (e) => {
   if (k === "ArrowRight" || k.toLowerCase() === "d") state.keys.right = false;
 });
 
-// Mouse: direct positioning
-canvas.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-  state.mouseX = x;
-  INPUT.mode = "mouse";
-  INPUT.lastMouseMove = performance.now();
-});
-canvas.addEventListener("mouseleave", () => {
-  if (INPUT.mode === "mouse") {
-    state.mouseX = null;
-    INPUT.mode = "none";
-  }
-});
+// === DRAG CONTROL ===
+let isDragging = false;
 
-// Touch
-function handleTouch(e) {
+function startDrag(x) {
   const rect = canvas.getBoundingClientRect();
-  const x = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
-  state.mouseX = x;
+  const gameX = (x - rect.left) * (canvas.width / rect.width);
+  state.mouseX = gameX;
   INPUT.mode = "mouse";
   INPUT.lastMouseMove = performance.now();
-  e.preventDefault();
+  isDragging = true;
 }
-canvas.addEventListener("touchstart", handleTouch, { passive: false });
-canvas.addEventListener("touchmove", handleTouch, { passive: false });
-canvas.addEventListener("touchend", () => {
+
+function dragMove(x) {
+  if (!isDragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const gameX = (x - rect.left) * (canvas.width / rect.width);
+  state.mouseX = gameX;
+  INPUT.mode = "mouse";
+  INPUT.lastMouseMove = performance.now();
+}
+
+function stopDrag() {
+  isDragging = false;
   state.mouseX = null;
   INPUT.mode = "none";
-});
+}
+
+// Mouse drag
+canvas.addEventListener("mousedown", (e) => startDrag(e.clientX));
+canvas.addEventListener("mousemove", (e) => dragMove(e.clientX));
+canvas.addEventListener("mouseup", stopDrag);
+canvas.addEventListener("mouseleave", stopDrag);
+
+// Touch drag
+canvas.addEventListener(
+  "touchstart",
+  (e) => {
+    startDrag(e.touches[0].clientX);
+    e.preventDefault();
+  },
+  { passive: false }
+);
+
+canvas.addEventListener(
+  "touchmove",
+  (e) => {
+    dragMove(e.touches[0].clientX);
+    e.preventDefault();
+  },
+  { passive: false }
+);
+
+canvas.addEventListener("touchend", stopDrag);
+canvas.addEventListener("touchcancel", stopDrag);
 
 // === UTIL ===
 function clamp(v, a, b) {
@@ -150,13 +175,9 @@ function update(dt) {
     state.player.x += vx * dt;
   }
 
-  // Mouse/touch movement
+  // Drag (mouse/touch)
   if (INPUT.mode === "mouse" && state.mouseX !== null) {
-    if (performance.now() - INPUT.lastMouseMove > 800) {
-      INPUT.mode = "none";
-    } else {
-      state.player.x = state.mouseX;
-    }
+    state.player.x = state.mouseX;
   }
 
   // Clamp inside canvas
