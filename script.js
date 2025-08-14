@@ -1,8 +1,8 @@
 // === CONFIG ===
 const CONFIG = {
-  moveSpeed: 520, // px/sec for keyboard
-  itemFallBase: 220, // px/sec starting fall speed
-  itemFallScale: 100, // extra px/sec per 10 score
+  moveSpeed: 520,
+  itemFallBase: 220,
+  itemFallScale: 100,
   playerScale: 0.9,
   itemScale: 0.9,
   healthMax: 3,
@@ -13,7 +13,7 @@ const CONFIG = {
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// === ASSETS (local images) ===
+// === ASSETS ===
 const playerImg = new Image();
 const itemImg = new Image();
 playerImg.src = "player.png";
@@ -22,7 +22,7 @@ let assetsLoaded = { player: false, item: false };
 playerImg.onload = () => (assetsLoaded.player = true);
 itemImg.onload = () => (assetsLoaded.item = true);
 
-// === INPUT MODE ===
+// === INPUT ===
 const INPUT = { mode: "none", lastMouseMove: 0 };
 
 // === STATE ===
@@ -35,13 +35,7 @@ const state = {
   keys: { left: false, right: false },
   mouseX: null,
   player: { x: canvas.width / 2, y: 0, w: 72, h: 72 },
-  item: {
-    x: Math.random() * canvas.width,
-    y: -50,
-    w: 48,
-    h: 48,
-    vy: CONFIG.itemFallBase,
-  },
+  item: { x: 0, y: 0, w: 48, h: 48, vy: CONFIG.itemFallBase },
 };
 
 function resetGame() {
@@ -71,7 +65,6 @@ function placeItem(reset = false) {
 }
 
 // === INPUT EVENTS ===
-// Keyboard
 window.addEventListener("keydown", (e) => {
   const k = e.key;
   if (k === "ArrowLeft" || k.toLowerCase() === "a") {
@@ -99,14 +92,16 @@ window.addEventListener("keyup", (e) => {
 
 // === DRAG CONTROL ===
 let isDragging = false;
+let activeTouchId = null;
 
-function startDrag(x) {
+function startDrag(x, touchId = null) {
   const rect = canvas.getBoundingClientRect();
   const gameX = (x - rect.left) * (canvas.width / rect.width);
   state.mouseX = gameX;
   INPUT.mode = "mouse";
   INPUT.lastMouseMove = performance.now();
   isDragging = true;
+  activeTouchId = touchId;
 }
 
 function dragMove(x) {
@@ -118,23 +113,26 @@ function dragMove(x) {
   INPUT.lastMouseMove = performance.now();
 }
 
-function stopDrag() {
+function stopDrag(touchId = null) {
+  if (touchId !== null && touchId !== activeTouchId) return;
   isDragging = false;
-  state.mouseX = null;
-  INPUT.mode = "none";
+  activeTouchId = null;
 }
 
 // Mouse drag
 canvas.addEventListener("mousedown", (e) => startDrag(e.clientX));
-canvas.addEventListener("mousemove", (e) => dragMove(e.clientX));
-canvas.addEventListener("mouseup", stopDrag);
-canvas.addEventListener("mouseleave", stopDrag);
+canvas.addEventListener("mousemove", (e) => {
+  if (isDragging) dragMove(e.clientX);
+});
+canvas.addEventListener("mouseup", () => stopDrag());
+canvas.addEventListener("mouseleave", () => stopDrag());
 
 // Touch drag
 canvas.addEventListener(
   "touchstart",
   (e) => {
-    startDrag(e.touches[0].clientX);
+    const t = e.changedTouches[0];
+    startDrag(t.clientX, t.identifier);
     e.preventDefault();
   },
   { passive: false }
@@ -143,14 +141,42 @@ canvas.addEventListener(
 canvas.addEventListener(
   "touchmove",
   (e) => {
-    dragMove(e.touches[0].clientX);
-    e.preventDefault();
+    for (let t of e.changedTouches) {
+      if (t.identifier === activeTouchId) {
+        dragMove(t.clientX);
+        e.preventDefault();
+        break;
+      }
+    }
   },
   { passive: false }
 );
 
-canvas.addEventListener("touchend", stopDrag);
-canvas.addEventListener("touchcancel", stopDrag);
+canvas.addEventListener(
+  "touchend",
+  (e) => {
+    for (let t of e.changedTouches) {
+      if (t.identifier === activeTouchId) {
+        stopDrag(t.identifier);
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
+
+canvas.addEventListener(
+  "touchcancel",
+  (e) => {
+    for (let t of e.changedTouches) {
+      if (t.identifier === activeTouchId) {
+        stopDrag(t.identifier);
+        break;
+      }
+    }
+  },
+  { passive: false }
+);
 
 // === UTIL ===
 function clamp(v, a, b) {
@@ -167,7 +193,6 @@ function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
 function update(dt) {
   if (!state.running || state.paused || state.gameOver) return;
 
-  // Keyboard movement
   if (INPUT.mode === "keys") {
     let vx = 0;
     if (state.keys.left) vx -= CONFIG.moveSpeed;
@@ -175,26 +200,21 @@ function update(dt) {
     state.player.x += vx * dt;
   }
 
-  // Drag (mouse/touch)
   if (INPUT.mode === "mouse" && state.mouseX !== null) {
     state.player.x = state.mouseX;
   }
 
-  // Clamp inside canvas
   state.player.x = clamp(
     state.player.x,
     state.player.w / 2,
     canvas.width - state.player.w / 2
   );
 
-  // 📌 Speed scaling live during fall
   const milestoneBoost = Math.floor(state.score / 10) * CONFIG.itemFallScale;
   state.item.vy = CONFIG.itemFallBase + milestoneBoost;
 
-  // Item falling
   state.item.y += state.item.vy * dt;
 
-  // Catch
   if (
     aabbOverlap(
       state.player.x,
@@ -211,7 +231,6 @@ function update(dt) {
     placeItem(true);
   }
 
-  // Missed
   if (state.item.y - state.item.h / 2 > canvas.height) {
     state.health -= 1;
     if (state.health <= 0) {
