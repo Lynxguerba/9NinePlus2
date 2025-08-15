@@ -3,8 +3,8 @@ const CONFIG = {
   moveSpeed: 520,
   itemFallBase: 220,
   itemFallScale: 100,
-  playerScale: 0.9,
-  itemScale: 0.9,
+  playerScale: 0.7,
+  itemScale: 1.2,
   healthMax: 3,
   catchGrace: 6,
 };
