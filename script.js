@@ -413,27 +413,28 @@ canvas.addEventListener(
 window.addEventListener("blur", () => {
   if (state.running && !state.gameOver) state.paused = true;
 });
-document.getElementById("leftBtn").addEventListener("touchstart", (e) => {
-  e.preventDefault();
-  touchingLeft = true;
-  INPUT.mode = "keys";
-});
 
-document.getElementById("leftBtn").addEventListener("touchend", (e) => {
-  e.preventDefault();
-  touchingLeft = false;
-});
+// document.getElementById("leftBtn").addEventListener("touchstart", (e) => {
+//   e.preventDefault();
+//   touchingLeft = true;
+//   INPUT.mode = "keys";
+// });
 
-document.getElementById("rightBtn").addEventListener("touchstart", (e) => {
-  e.preventDefault();
-  touchingRight = true;
-  INPUT.mode = "keys";
-});
+// document.getElementById("leftBtn").addEventListener("touchend", (e) => {
+//   e.preventDefault();
+//   touchingLeft = false;
+// });
 
-document.getElementById("rightBtn").addEventListener("touchend", (e) => {
-  e.preventDefault();
-  touchingRight = false;
-});
+// document.getElementById("rightBtn").addEventListener("touchstart", (e) => {
+//   e.preventDefault();
+//   touchingRight = true;
+//   INPUT.mode = "keys";
+// });
+
+// document.getElementById("rightBtn").addEventListener("touchend", (e) => {
+//   e.preventDefault();
+//   touchingRight = false;
+// });
 
 document.getElementById("pauseBtn").addEventListener("click", () => {
   if (state.running && !state.gameOver) {
