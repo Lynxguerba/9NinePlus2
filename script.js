@@ -9,6 +9,9 @@ const CONFIG = {
   catchGrace: 6,
 };
 
+let touchingLeft = false;
+let touchingRight = false;
+
 // === CANVAS ===
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -193,10 +196,17 @@ function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
 function update(dt) {
   if (!state.running || state.paused || state.gameOver) return;
 
+  // if (INPUT.mode === "keys") {
+  //   let vx = 0;
+  //   if (state.keys.left) vx -= CONFIG.moveSpeed;
+  //   if (state.keys.right) vx += CONFIG.moveSpeed;
+  //   state.player.x += vx * dt;
+  // }
+
   if (INPUT.mode === "keys") {
     let vx = 0;
-    if (state.keys.left) vx -= CONFIG.moveSpeed;
-    if (state.keys.right) vx += CONFIG.moveSpeed;
+    if (state.keys.left || touchingLeft) vx -= CONFIG.moveSpeed;
+    if (state.keys.right || touchingRight) vx += CONFIG.moveSpeed;
     state.player.x += vx * dt;
   }
 
@@ -402,4 +412,35 @@ canvas.addEventListener(
 // Auto-pause on blur
 window.addEventListener("blur", () => {
   if (state.running && !state.gameOver) state.paused = true;
+});
+document.getElementById("leftBtn").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  touchingLeft = true;
+  INPUT.mode = "keys";
+});
+
+document.getElementById("leftBtn").addEventListener("touchend", (e) => {
+  e.preventDefault();
+  touchingLeft = false;
+});
+
+document.getElementById("rightBtn").addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  touchingRight = true;
+  INPUT.mode = "keys";
+});
+
+document.getElementById("rightBtn").addEventListener("touchend", (e) => {
+  e.preventDefault();
+  touchingRight = false;
+});
+
+document.getElementById("pauseBtn").addEventListener("click", () => {
+  if (state.running && !state.gameOver) {
+    state.paused = !state.paused;
+  }
+});
+
+document.getElementById("restartBtn").addEventListener("click", () => {
+  resetGame();
 });

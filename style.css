@@ -1,30 +1,84 @@
 :root {
-      --bg: #0f1226;
-      --ui: #ffffff;
-      --good: #29d17e;
-      --bad: #ff4d6d;
-      --accent: #7aa2ff;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; display: grid; place-items: center; min-height: 100vh;
-      background: radial-gradient(1000px 700px at 50% 20%, #171a37 0%, var(--bg) 60%);
-      color: var(--ui); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .wrap {
-      display: grid; gap: 10px; justify-items: center;
-    }
-    canvas {
-      background: linear-gradient(#0e1022, #0a0c1a);
-      border: 2px solid #2a2e5a; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      image-rendering: pixelated;
-      max-width: 95vw; height: auto;
-    }
-    .hint {
-      opacity: .8; font-size: .9rem; text-align: center;
-    }
-    .btn {
-      appearance: none; border: 0; padding: .6rem 1rem; border-radius: 10px;
-      background: var(--accent); color: #081028; font-weight: 700; cursor: pointer;
-      box-shadow: 0 6px 16px rgba(122,162,255,.35);
-    }
+  --bg: #0f1226;
+  --ui: #ffffff;
+  --good: #29d17e;
+  --bad: #ff4d6d;
+  --accent: #7aa2ff;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: radial-gradient(
+    1000px 700px at 50% 20%,
+    #171a37 0%,
+    var(--bg) 60%
+  );
+  color: var(--ui);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+.wrap {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+canvas {
+  background: linear-gradient(#0e1022, #0a0c1a);
+  border: 2px solid #2a2e5a;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
+  max-width: 95vw;
+  height: auto;
+}
+.hint {
+  opacity: 0.8;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.btn {
+  appearance: none;
+  border: 0;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #081028;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(122, 162, 255, 0.35);
+}
+
+.controls {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.controls button {
+  padding: 12px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  background-color: #2d2d4f;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.controls button:hover {
+  background-color: #44446b;
+}
+
+@media (max-width: 480px) {
+  .controls button {
+    flex: 1 1 40%;
+    font-size: 14px;
+  }
+}
