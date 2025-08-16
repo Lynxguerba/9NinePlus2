@@ -63,7 +63,8 @@ function placeItem(reset = false) {
   state.item.x =
     Math.random() * (canvas.width - state.item.w) + state.item.w / 2;
   state.item.y = reset ? -state.item.h : -Math.random() * 200 - state.item.h;
-  const speedBoost = Math.floor(state.score / 10) * CONFIG.itemFallScale;
+  const cappedScore = Math.min(state.score, 100);
+  const speedBoost = Math.floor(cappedScore / 10) * CONFIG.itemFallScale;
   state.item.vy = CONFIG.itemFallBase + speedBoost;
 }
 
