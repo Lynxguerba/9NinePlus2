@@ -6,7 +6,7 @@ const CONFIG = {
   playerScale: 0.7,
   itemScale: 1.2,
   healthMax: 3,
-  catchGrace: 6,
+  hitGrace: 6,
 };
 
 let touchingLeft = false;
@@ -28,6 +28,64 @@ itemImg.onload = () => (assetsLoaded.item = true);
 // === INPUT ===
 const INPUT = { mode: "none", lastMouseMove: 0 };
 
+// === ITEM COUNT BY SCORE ===
+function getMaxItems(score) {
+  if (score >= 50) return 3;
+  return 2;
+}
+
+// === ITEM FALL SPEED ===
+function getFallSpeed(score) {
+  const cappedScore = Math.min(score, 100);
+  const speedBoost = Math.floor(cappedScore / 10) * CONFIG.itemFallScale;
+  return CONFIG.itemFallBase + speedBoost;
+}
+
+// === EXPLOSION PARTICLES ===
+let explosions = [];
+
+function spawnExplosion(x, y, color1, color2, count) {
+  const n = count || 20;
+  for (let i = 0; i < n; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 220;
+    const life = 0.6 + Math.random() * 0.4;
+    explosions.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: 3 + Math.random() * 6,
+      alpha: 1,
+      color: Math.random() < 0.5 ? color1 : color2,
+      life,
+      maxLife: life,
+    });
+  }
+}
+
+function updateExplosions(dt) {
+  explosions = explosions.filter((p) => p.life > 0);
+  for (const p of explosions) {
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 250 * dt; // gravity
+    p.life -= dt;
+    p.alpha = Math.max(0, p.life / p.maxLife);
+  }
+}
+
+function drawExplosions() {
+  for (const p of explosions) {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 // === STATE ===
 const state = {
   running: false,
@@ -38,34 +96,60 @@ const state = {
   keys: { left: false, right: false },
   mouseX: null,
   player: { x: canvas.width / 2, y: 0, w: 72, h: 72 },
-  item: { x: 0, y: 0, w: 48, h: 48, vy: CONFIG.itemFallBase },
+  items: [],
+  itemW: 48,
+  itemH: 48,
+  blinkTimer: 0,
 };
+
+// === ITEM HELPERS ===
+function makeItem() {
+  return {
+    x: 0,
+    y: -state.itemH,
+    w: state.itemW,
+    h: state.itemH,
+    vy: CONFIG.itemFallBase,
+  };
+}
+
+function placeItemAt(item, resetY) {
+  item.w = state.itemW;
+  item.h = state.itemH;
+  item.x = Math.random() * (canvas.width - item.w) + item.w / 2;
+  item.y = resetY ? -item.h : -(Math.random() * 200 + item.h);
+  item.vy = getFallSpeed(state.score);
+}
+
+function buildItems(count) {
+  state.items = [];
+  for (let i = 0; i < count; i++) {
+    const item = makeItem();
+    placeItemAt(item, false);
+    // stagger so they don't all appear at once
+    item.y = -(item.h + i * (Math.random() * 120 + 80));
+    state.items.push(item);
+  }
+}
 
 function resetGame() {
   state.score = 0;
   state.health = CONFIG.healthMax;
   state.gameOver = false;
   state.paused = false;
+  state.blinkTimer = 0;
   INPUT.mode = "none";
   state.mouseX = null;
-  placeItem(true);
+  explosions = [];
   fitSpritesToImages();
   centerPlayer();
+  buildItems(getMaxItems(0));
   state.running = true;
 }
 
 function centerPlayer() {
   state.player.x = canvas.width / 2;
   state.player.y = canvas.height - Math.max(80, state.player.h * 0.65);
-}
-
-function placeItem(reset = false) {
-  state.item.x =
-    Math.random() * (canvas.width - state.item.w) + state.item.w / 2;
-  state.item.y = reset ? -state.item.h : -Math.random() * 200 - state.item.h;
-  const cappedScore = Math.min(state.score, 100);
-  const speedBoost = Math.floor(cappedScore / 10) * CONFIG.itemFallScale;
-  state.item.vy = CONFIG.itemFallBase + speedBoost;
 }
 
 // === INPUT EVENTS ===
@@ -186,10 +270,11 @@ canvas.addEventListener(
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
 }
+
 function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
   return (
-    Math.abs(ax - bx) <= aw / 2 + bw / 2 - CONFIG.catchGrace &&
-    Math.abs(ay - by) <= ah / 2 + bh / 2 - CONFIG.catchGrace
+    Math.abs(ax - bx) <= aw / 2 + bw / 2 - CONFIG.hitGrace &&
+    Math.abs(ay - by) <= ah / 2 + bh / 2 - CONFIG.hitGrace
   );
 }
 
@@ -197,67 +282,74 @@ function aabbOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
 function update(dt) {
   if (!state.running || state.paused || state.gameOver) return;
 
-  // if (INPUT.mode === "keys") {
-  //   let vx = 0;
-  //   if (state.keys.left) vx -= CONFIG.moveSpeed;
-  //   if (state.keys.right) vx += CONFIG.moveSpeed;
-  //   state.player.x += vx * dt;
-  // }
+  state.blinkTimer += dt;
 
+  // --- Player movement ---
   if (INPUT.mode === "keys") {
     let vx = 0;
     if (state.keys.left || touchingLeft) vx -= CONFIG.moveSpeed;
     if (state.keys.right || touchingRight) vx += CONFIG.moveSpeed;
     state.player.x += vx * dt;
   }
-
   if (INPUT.mode === "mouse" && state.mouseX !== null) {
     state.player.x = state.mouseX;
   }
-
   state.player.x = clamp(
     state.player.x,
     state.player.w / 2,
     canvas.width - state.player.w / 2
   );
 
-  const milestoneBoost = Math.floor(state.score / 10) * CONFIG.itemFallScale;
-  state.item.vy = CONFIG.itemFallBase + milestoneBoost;
-
-  state.item.y += state.item.vy * dt;
-
-  if (
-    aabbOverlap(
-      state.player.x,
-      state.player.y,
-      state.player.w,
-      state.player.h,
-      state.item.x,
-      state.item.y,
-      state.item.w,
-      state.item.h
-    )
-  ) {
-    state.score += 1;
-    placeItem(true);
+  // --- Ensure correct item count for current score ---
+  const targetCount = getMaxItems(state.score);
+  while (state.items.length < targetCount) {
+    const item = makeItem();
+    placeItemAt(item, false);
+    state.items.push(item);
   }
 
-  if (state.item.y - state.item.h / 2 > canvas.height) {
-    state.health -= 1;
-    if (state.health <= 0) {
-      state.health = 0;
-      state.gameOver = true;
-      state.running = false;
-    } else {
-      placeItem(true);
+  // --- Update items ---
+  const fallSpeed = getFallSpeed(state.score);
+  for (const item of state.items) {
+    item.vy = fallSpeed;
+    item.y += item.vy * dt;
+
+    // Collision: player hit by falling item
+    if (
+      aabbOverlap(
+        state.player.x, state.player.y, state.player.w, state.player.h,
+        item.x, item.y, item.w, item.h
+      )
+    ) {
+      spawnExplosion(item.x, item.y, "#ff4d6d", "#ffaa00");
+      state.health -= 1;
+      if (state.health <= 0) {
+        state.health = 0;
+        // Big explosion on player
+        spawnExplosion(state.player.x, state.player.y, "#ffffff", "#ff4d6d", 30);
+        spawnExplosion(state.player.x, state.player.y, "#ffaa00", "#7aa2ff", 20);
+        state.gameOver = true;
+        state.running = false;
+      }
+      // Reset item above screen
+      placeItemAt(item, false);
+    }
+
+    // Item passed the bottom — player successfully avoided it → +1 score
+    if (item.y - item.h / 2 > canvas.height) {
+      state.score += 1;
+      placeItemAt(item, false);
     }
   }
+
+  updateExplosions(dt);
 }
 
 // === DRAW ===
 function clear() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
+
 function drawGridBg() {
   ctx.save();
   ctx.globalAlpha = 0.15;
@@ -276,16 +368,20 @@ function drawGridBg() {
   ctx.stroke();
   ctx.restore();
 }
-function drawEntity(img, x, y, w, h, fallbackColor) {
-  const left = x - w / 2,
-    top = y - h / 2;
+
+function drawEntityAlpha(img, x, y, w, h, fallbackColor, alpha) {
+  const left = x - w / 2, top = y - h / 2;
+  ctx.save();
+  ctx.globalAlpha = alpha;
   if (img && img.complete && img.naturalWidth > 0)
     ctx.drawImage(img, left, top, w, h);
   else {
     ctx.fillStyle = fallbackColor;
     ctx.fillRect(left, top, w, h);
   }
+  ctx.restore();
 }
+
 function overlayText(title, subtitle) {
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -298,23 +394,22 @@ function overlayText(title, subtitle) {
   ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 26);
   ctx.restore();
 }
+
 function drawUI() {
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.fillRect(12, 12, 130, 46);
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.strokeRect(12, 12, 130, 46);
   ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
   ctx.font = "bold 18px system-ui, sans-serif";
   ctx.fillText("Score", 20, 32);
   ctx.font = "bold 22px system-ui, sans-serif";
   ctx.fillStyle = "#29d17e";
   ctx.fillText(String(state.score), 20, 54);
 
-  const max = CONFIG.healthMax,
-    barW = 24,
-    gap = 8;
-  const x0 = canvas.width - (max * barW + (max - 1) * gap) - 16,
-    y0 = 18;
+  const max = CONFIG.healthMax, barW = 24, gap = 8;
+  const x0 = canvas.width - (max * barW + (max - 1) * gap) - 16, y0 = 18;
   for (let i = 0; i < max; i++) {
     const x = x0 + i * (barW + gap);
     ctx.fillStyle = i < state.health ? "#ff738a" : "#3a3a5f";
@@ -340,25 +435,39 @@ function drawUI() {
     ctx.restore();
   }
 }
+
+// Retro blink: alternates visibility every 150ms when health is 1
+const BLINK_PERIOD = 0.15;
+function getBlinkAlpha() {
+  if (state.health === 1 && !state.gameOver) {
+    return Math.floor(state.blinkTimer / BLINK_PERIOD) % 2 === 0 ? 1 : 0.12;
+  }
+  return 1;
+}
+
 function draw() {
   clear();
   drawGridBg();
-  drawEntity(
-    itemImg,
-    state.item.x,
-    state.item.y,
-    state.item.w,
-    state.item.h,
-    "#7aa2ff"
-  );
-  drawEntity(
-    playerImg,
-    state.player.x,
-    state.player.y,
-    state.player.w,
-    state.player.h,
-    "#29d17e"
-  );
+
+  const blinkAlpha = getBlinkAlpha();
+
+  // Draw falling items
+  for (const item of state.items) {
+    drawEntityAlpha(itemImg, item.x, item.y, item.w, item.h, "#7aa2ff", blinkAlpha);
+  }
+
+  // Draw player (hidden on game over so explosion takes center stage)
+  if (!state.gameOver) {
+    drawEntityAlpha(
+      playerImg,
+      state.player.x, state.player.y,
+      state.player.w, state.player.h,
+      "#29d17e",
+      blinkAlpha
+    );
+  }
+
+  drawExplosions();
   drawUI();
 }
 
@@ -371,17 +480,21 @@ function fitSpritesToImages() {
   }
   if (assetsLoaded.item) {
     const base = Math.min(64, itemImg.width, itemImg.height);
-    state.item.w = base * CONFIG.itemScale;
-    state.item.h = base * CONFIG.itemScale;
+    state.itemW = base * CONFIG.itemScale;
+    state.itemH = base * CONFIG.itemScale;
+    for (const item of state.items) {
+      item.w = state.itemW;
+      item.h = state.itemH;
+    }
   }
   centerPlayer();
 }
 playerImg.addEventListener("load", fitSpritesToImages);
 itemImg.addEventListener("load", fitSpritesToImages);
 
-placeItem(true);
 fitSpritesToImages();
 centerPlayer();
+buildItems(getMaxItems(0));
 state.running = false;
 
 let lastTime = performance.now();
@@ -414,28 +527,6 @@ canvas.addEventListener(
 window.addEventListener("blur", () => {
   if (state.running && !state.gameOver) state.paused = true;
 });
-
-// document.getElementById("leftBtn").addEventListener("touchstart", (e) => {
-//   e.preventDefault();
-//   touchingLeft = true;
-//   INPUT.mode = "keys";
-// });
-
-// document.getElementById("leftBtn").addEventListener("touchend", (e) => {
-//   e.preventDefault();
-//   touchingLeft = false;
-// });
-
-// document.getElementById("rightBtn").addEventListener("touchstart", (e) => {
-//   e.preventDefault();
-//   touchingRight = true;
-//   INPUT.mode = "keys";
-// });
-
-// document.getElementById("rightBtn").addEventListener("touchend", (e) => {
-//   e.preventDefault();
-//   touchingRight = false;
-// });
 
 document.getElementById("pauseBtn").addEventListener("click", () => {
   if (state.running && !state.gameOver) {
