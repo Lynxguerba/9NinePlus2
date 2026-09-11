@@ -85,6 +85,129 @@ function drawExplosions() {
     ctx.restore();
   }
 }
+// === CLOUDS ===
+const CLOUD_COUNT   = 12;
+const CLOUD_SPEED   = 38;   // px/s — fixed, never scales with score
+
+const clouds = [];
+
+function makeCloud() {
+  return {
+    x:      Math.random() * canvas.width,
+    y:      Math.random() * canvas.height,          // random start across full height
+    r:      18 + Math.random() * 38,                // base radius of each puff
+    puffs:  2 + Math.floor(Math.random() * 3),      // 2–4 puffs per cloud
+    speed:  CLOUD_SPEED * (0.6 + Math.random() * 0.8), // slight per-cloud variation
+    alpha:  0.04 + Math.random() * 0.09,            // very faint
+  };
+}
+
+// Init clouds spread across the whole canvas
+for (let i = 0; i < CLOUD_COUNT; i++) clouds.push(makeCloud());
+
+function updateClouds(dt) {
+  for (const c of clouds) {
+    c.y += c.speed * dt;
+    // Wrap back to top when fully off-screen at bottom
+    if (c.y - c.r > canvas.height) {
+      c.y     = -(c.r * 2);
+      c.x     = Math.random() * canvas.width;
+      c.r     = 18 + Math.random() * 38;
+      c.puffs = 2 + Math.floor(Math.random() * 3);
+      c.alpha = 0.04 + Math.random() * 0.09;
+    }
+  }
+}
+
+function drawClouds() {
+  ctx.save();
+  for (const c of clouds) {
+    ctx.globalAlpha = c.alpha;
+    ctx.fillStyle = "#c8d8ff";
+    ctx.beginPath();
+    // Draw overlapping circles to form a cloud puff shape
+    const spread = c.r * 0.7;
+    for (let p = 0; p < c.puffs; p++) {
+      const angle = (p / c.puffs) * Math.PI; // arc across the top
+      const px = c.x + Math.cos(angle) * spread * (p % 2 === 0 ? 1 : -0.5);
+      const py = c.y + Math.sin(angle) * spread * 0.35;
+      const pr = c.r * (0.7 + Math.random() * 0.0); // consistent per frame
+      ctx.moveTo(px + pr, py);
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// === WIND TRAILS ===
+const windTrails = [];
+const WIND_SPAWN_RATE = 0.025; // seconds between each trail burst
+let windSpawnTimer = 0;
+
+function spawnWindTrails() {
+  const p = state.player;
+  // Emit from left wing tip, right wing tip, and centre tail
+  const emitPoints = [
+    { ox: -p.w * 0.38, oy:  p.h * 0.05 },  // left wing
+    { ox:  p.w * 0.38, oy:  p.h * 0.05 },  // right wing
+    { ox:  0,          oy:  p.h * 0.40 },  // tail centre
+  ];
+
+  for (const ep of emitPoints) {
+    const count = 1 + Math.floor(Math.random() * 2); // 1–2 streaks per point
+    for (let i = 0; i < count; i++) {
+      const life = 0.28 + Math.random() * 0.22;
+      windTrails.push({
+        x:    p.x + ep.ox + (Math.random() - 0.5) * 6,
+        y:    p.y + ep.oy + (Math.random() - 0.5) * 4,
+        vx:   (Math.random() - 0.5) * 18,    // slight lateral drift
+        vy:   -(18 + Math.random() * 28),     // drifts upward (opposite flight dir)
+        len:  10 + Math.random() * 18,        // streak length
+        life,
+        maxLife: life,
+      });
+    }
+  }
+}
+
+function updateWindTrails(dt) {
+  windSpawnTimer -= dt;
+  if (windSpawnTimer <= 0 && state.running && !state.gameOver) {
+    spawnWindTrails();
+    windSpawnTimer = WIND_SPAWN_RATE;
+  }
+  for (const t of windTrails) {
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+    t.life -= dt;
+  }
+  // Remove dead trails
+  for (let i = windTrails.length - 1; i >= 0; i--) {
+    if (windTrails[i].life <= 0) windTrails.splice(i, 1);
+  }
+}
+
+function drawWindTrails() {
+  ctx.save();
+  ctx.lineCap = "round";
+  for (const t of windTrails) {
+    const progress = t.life / t.maxLife;          // 1 → 0
+    ctx.globalAlpha = progress * 0.45;            // fade out
+    const trailLen = t.len * progress;            // shrink as it fades
+
+    // Colour cycles subtly: white → light sky blue
+    const b = Math.floor(200 + 55 * (1 - progress));
+    ctx.strokeStyle = `rgb(210,225,${b})`;
+    ctx.lineWidth = 1.5 * progress + 0.5;
+
+    ctx.beginPath();
+    ctx.moveTo(t.x, t.y);
+    ctx.lineTo(t.x + t.vx * 0.06, t.y + trailLen); // streak downward from spawn point
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 
 // === STATE ===
 const state = {
@@ -283,6 +406,8 @@ function update(dt) {
   if (!state.running || state.paused || state.gameOver) return;
 
   state.blinkTimer += dt;
+  updateClouds(dt);
+  updateWindTrails(dt);
 
   // --- Player movement ---
   if (INPUT.mode === "keys") {
@@ -448,6 +573,7 @@ function getBlinkAlpha() {
 function draw() {
   clear();
   drawGridBg();
+  drawClouds();
 
   const blinkAlpha = getBlinkAlpha();
 
@@ -458,6 +584,7 @@ function draw() {
 
   // Draw player (hidden on game over so explosion takes center stage)
   if (!state.gameOver) {
+    drawWindTrails();
     drawEntityAlpha(
       playerImg,
       state.player.x, state.player.y,
@@ -537,3 +664,14 @@ document.getElementById("pauseBtn").addEventListener("click", () => {
 document.getElementById("restartBtn").addEventListener("click", () => {
   resetGame();
 });
+
+// === INFO MODAL ===
+const infoModal = document.getElementById("infoModal");
+const startBtn  = document.getElementById("startBtn");
+
+function closeModal() {
+  infoModal.classList.add("hidden");
+  resetGame();
+}
+
+startBtn.addEventListener("click", closeModal);

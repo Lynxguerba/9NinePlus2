@@ -8,12 +8,55 @@
     <link rel="icon" href="logo.png" type="image/png">
   </head>
   <body>
+
+    <!-- ===== INFO MODAL ===== -->
+    <div id="infoModal" class="modal-backdrop">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span class="modal-logo">✈️</span>
+          <h1 class="modal-title">9 Nine Plus Two</h1>
+          <p class="modal-sub">Dodge &amp; Survive!</p>
+        </div>
+
+        <div class="modal-body">
+          <h2>How to Play</h2>
+          <p>Dodge the buildings — <strong>don't let hit on it!</strong> Move your plane left and right to dodge every buildings.</p>
+
+          <h2>Controls</h2>
+          <ul>
+            <li><strong>Keyboard:</strong> ← → Arrow keys or A / D</li>
+            <li><strong>Mouse / Touch:</strong> Click &amp; drag on the canvas</li>
+            <li><strong>Pause:</strong> Press <kbd>P</kbd></li>
+            <li><strong>Restart:</strong> Press <kbd>R</kbd> or <kbd>Enter</kbd></li>
+          </ul>
+
+          <h2>Scoring &amp; Difficulty</h2>
+          <table class="modal-table">
+            <thead>
+              <tr><th>Score</th><th>Falling Items</th><th>Speed</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>0 – 49</td><td>2 items</td><td>Increases every 10 pts</td></tr>
+              <tr><td>50 +</td><td>3 items</td><td>Increases every 10 pts</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Health</h2>
+          <p>You have <strong>3 health bars</strong> (top-right). Each hit removes one. When health hits zero — <strong>BOOM!</strong></p>
+          <p class="modal-tip">Last health bar? Your plane will blink as a warning!</p>
+        </div>
+
+        <button id="startBtn" class="modal-start-btn">I Understand — Let's Play!</button>
+      </div>
+    </div>
+    <!-- ===== END MODAL ===== -->
+
     <div class="wrap">
       <canvas
         id="game"
         width="480"
         height="720"
-        aria-label="Catch Game"
+        aria-label="Dodge Game"
       ></canvas>
       <div class="hint">
         Move: ◄ ► / Drag / Mouse • Pause: P • Restart: R/Enter
