@@ -38,9 +38,16 @@ function getMaxItems(score) {
 
 // === ITEM FALL SPEED ===
 function getFallSpeed(score) {
+  // Base scaling: +100 px/s every 10 points, capped at score 100
   const cappedScore = Math.min(score, 100);
-  const speedBoost = Math.floor(cappedScore / 10) * CONFIG.itemFallScale;
-  return CONFIG.itemFallBase + speedBoost;
+  const speedBoost  = Math.floor(cappedScore / 10) * CONFIG.itemFallScale;
+  let speed = CONFIG.itemFallBase + speedBoost;
+
+  // Milestone speed surges at 300 and 400
+  if (score >= 400) speed += 500;       // +250 at 300, +250 more at 400
+  else if (score >= 300) speed += 250;
+
+  return speed;
 }
 
 // === EXPLOSION PARTICLES ===
