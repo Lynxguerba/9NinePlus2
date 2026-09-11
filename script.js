@@ -30,7 +30,9 @@ const INPUT = { mode: "none", lastMouseMove: 0 };
 
 // === ITEM COUNT BY SCORE ===
 function getMaxItems(score) {
-  if (score >= 50) return 3;
+  if (score >= 400) return 6;
+  if (score >= 300) return 5;
+  if (score >= 50)  return 3;
   return 2;
 }
 
